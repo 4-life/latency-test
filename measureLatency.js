@@ -10,9 +10,12 @@ export async function measureLatency(url, fetchFn = fetch) {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
-    const body = await res.arrayBuffer();
+    if (res.body) {
+      for await (const chunk of res.body) {
+        size += chunk.length;
+      }
+    }
     totalTime += performance.now() - start;
-    size += body.byteLength;
   }
 
   return [totalTime / REQUESTS, size];

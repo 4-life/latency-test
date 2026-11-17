@@ -14,7 +14,7 @@ function createFetch(sizes, delayMs = 0) {
     if (delayMs) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
-    return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(size) };
+    return { ok: true, status: 200, body: [new Uint8Array(size)] };
   };
   return { fetchFn, calls };
 }
@@ -41,6 +41,16 @@ test('returns average request time', async () => {
   assert.ok(avgMs < 200, `expected avg < 200ms, got ${avgMs}`);
 });
 
+test('counts bytes across multiple chunks', async () => {
+  const fetchFn = async () => ({
+    ok: true,
+    status: 200,
+    body: [new Uint8Array(10), new Uint8Array(20), new Uint8Array(30)],
+  });
+  const [, size] = await measureLatency(URL, fetchFn);
+  assert.equal(size, REQUESTS * 60);
+});
+
 test('requests run sequentially, not in parallel', async () => {
   let active = 0;
   let maxActive = 0;
@@ -49,7 +59,7 @@ test('requests run sequentially, not in parallel', async () => {
     maxActive = Math.max(maxActive, active);
     await new Promise((resolve) => setTimeout(resolve, 5));
     active--;
-    return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(1) };
+    return { ok: true, status: 200, body: [new Uint8Array(1)] };
   };
   await measureLatency(URL, fetchFn);
   assert.equal(maxActive, 1);
@@ -59,7 +69,7 @@ test('throws on non-2xx response', async () => {
   const fetchFn = async () => ({
     ok: false,
     status: 404,
-    arrayBuffer: async () => new ArrayBuffer(10),
+    body: [new Uint8Array(10)],
   });
   await assert.rejects(measureLatency(URL, fetchFn), /HTTP 404/);
 });
